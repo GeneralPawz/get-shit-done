@@ -45,7 +45,7 @@ vi.mock('@anthropic-ai/claude-agent-sdk', () => {
 
 // ─── Import SUT after mock is hoisted ────────────────────────────────────────
 
-import { runPhaseStepSession } from './session-runner.js';
+import { runPhaseStepSession, resolveClaudeCodeExecutable, resetClaudeCodeExecutableCacheForTests } from './session-runner.js';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -94,5 +94,51 @@ describe('runPhaseStepSession', () => {
 
     expect(result.success).toBe(true);
     expect(result.sessionId).toBe('test-session');
+  });
+
+  it('threads pathToClaudeCodeExecutable into query() options when resolvable', async () => {
+    resetClaudeCodeExecutableCacheForTests();
+    const original = process.env.CLAUDE_CODE_EXECUTABLE;
+    process.env.CLAUDE_CODE_EXECUTABLE = '/tmp/fake-claude-bin';
+    try {
+      await runPhaseStepSession('Test prompt', PhaseStepType.Execute, makeConfig());
+      const call = mockQueryCalls[mockQueryCalls.length - 1];
+      expect(call.options.pathToClaudeCodeExecutable).toBe('/tmp/fake-claude-bin');
+    } finally {
+      if (original === undefined) delete process.env.CLAUDE_CODE_EXECUTABLE;
+      else process.env.CLAUDE_CODE_EXECUTABLE = original;
+      resetClaudeCodeExecutableCacheForTests();
+    }
+  });
+});
+
+describe('resolveClaudeCodeExecutable', () => {
+  it('respects CLAUDE_CODE_EXECUTABLE env override', () => {
+    resetClaudeCodeExecutableCacheForTests();
+    const original = process.env.CLAUDE_CODE_EXECUTABLE;
+    process.env.CLAUDE_CODE_EXECUTABLE = '/opt/claude/bin/claude';
+    try {
+      expect(resolveClaudeCodeExecutable()).toBe('/opt/claude/bin/claude');
+    } finally {
+      if (original === undefined) delete process.env.CLAUDE_CODE_EXECUTABLE;
+      else process.env.CLAUDE_CODE_EXECUTABLE = original;
+      resetClaudeCodeExecutableCacheForTests();
+    }
+  });
+
+  it('memoizes the resolved path across calls', () => {
+    resetClaudeCodeExecutableCacheForTests();
+    const original = process.env.CLAUDE_CODE_EXECUTABLE;
+    process.env.CLAUDE_CODE_EXECUTABLE = '/cached/path/claude';
+    try {
+      const first = resolveClaudeCodeExecutable();
+      process.env.CLAUDE_CODE_EXECUTABLE = '/different/path/claude';
+      const second = resolveClaudeCodeExecutable();
+      expect(second).toBe(first);
+    } finally {
+      if (original === undefined) delete process.env.CLAUDE_CODE_EXECUTABLE;
+      else process.env.CLAUDE_CODE_EXECUTABLE = original;
+      resetClaudeCodeExecutableCacheForTests();
+    }
   });
 });

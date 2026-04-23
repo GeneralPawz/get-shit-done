@@ -5,6 +5,7 @@
  * processes the message stream, and extracts results into a typed PlanResult.
  */
 
+import { execSync } from 'node:child_process';
 import { query } from '@anthropic-ai/claude-agent-sdk';
 import type { SDKMessage, SDKResultMessage, SDKResultSuccess, SDKResultError } from '@anthropic-ai/claude-agent-sdk';
 import type { ParsedPlan, PlanResult, SessionOptions, SessionUsage, GSDCostUpdateEvent, PhaseStepType } from './types.js';
@@ -13,6 +14,34 @@ import type { GSDConfig } from './config.js';
 import { buildExecutorPrompt, parseAgentTools, DEFAULT_ALLOWED_TOOLS } from './prompt-builder.js';
 import type { GSDEventStream, EventStreamContext } from './event-stream.js';
 import { getToolsForPhase } from './tool-scoping.js';
+
+// ─── Claude Code executable resolution ───────────────────────────────────────
+
+// Since @anthropic-ai/claude-agent-sdk@0.2.117 the SDK defaults to a bundled
+// native binary chosen by platform detection. On WSL2 aarch64 glibc hosts it
+// picks the musl variant, which fails at runtime with "native binary not
+// found". Prefer the user's system `claude` install when available.
+let cachedClaudeCodeExecutable: string | undefined | null = null;
+
+export function resolveClaudeCodeExecutable(): string | undefined {
+  if (cachedClaudeCodeExecutable !== null) return cachedClaudeCodeExecutable;
+  const envOverride = process.env.CLAUDE_CODE_EXECUTABLE;
+  if (envOverride) {
+    cachedClaudeCodeExecutable = envOverride;
+    return cachedClaudeCodeExecutable;
+  }
+  try {
+    const resolved = execSync('command -v claude', { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+    cachedClaudeCodeExecutable = resolved || undefined;
+  } catch {
+    cachedClaudeCodeExecutable = undefined;
+  }
+  return cachedClaudeCodeExecutable;
+}
+
+export function resetClaudeCodeExecutableCacheForTests(): void {
+  cachedClaudeCodeExecutable = null;
+}
 
 // ─── Model resolution ────────────────────────────────────────────────────────
 
@@ -75,6 +104,8 @@ export async function runPlanSession(
   const maxBudgetUsd = options?.maxBudgetUsd ?? 5.0;
   const cwd = options?.cwd ?? process.cwd();
 
+  const pathToClaudeCodeExecutable = resolveClaudeCodeExecutable();
+
   const queryStream = query({
     prompt: `Execute this plan:\n\n${plan.objective || 'Execute the plan tasks below.'}`,
     options: {
@@ -91,6 +122,7 @@ export async function runPlanSession(
       maxBudgetUsd,
       cwd,
       ...(model ? { model } : {}),
+      ...(pathToClaudeCodeExecutable ? { pathToClaudeCodeExecutable } : {}),
     },
   });
 
@@ -276,6 +308,8 @@ export async function runPhaseStepSession(
   const maxBudgetUsd = options?.maxBudgetUsd ?? 5.0;
   const cwd = options?.cwd ?? process.cwd();
 
+  const pathToClaudeCodeExecutable = resolveClaudeCodeExecutable();
+
   const queryStream = query({
     prompt: `Execute this phase step: ${phaseStep}`,
     options: {
@@ -292,6 +326,7 @@ export async function runPhaseStepSession(
       maxBudgetUsd,
       cwd,
       ...(model ? { model } : {}),
+      ...(pathToClaudeCodeExecutable ? { pathToClaudeCodeExecutable } : {}),
     },
   });
 
