@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "deny": [
+      "Write(/**)",
+      "Bash(*)"
+    ],
+    "allow": [
+      "Write(<WORKTREE>/.planning/drafts/**)",
+      "Write(<WORKTREE>/.planning/seeds/**)",
+      "Write(<WORKTREE>/.planning/VISION-CATCHUP.md)",
+      "Write(<WORKTREE>/vision-state.json)",
+      "Read(<WORKTREE>/**)",
+      "Read(<REPO_RO>/**)"
+    ]
+  }
+}
