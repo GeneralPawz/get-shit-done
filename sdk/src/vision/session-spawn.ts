@@ -15,7 +15,8 @@
  */
 
 import { spawn, type ChildProcess } from 'node:child_process';
-import { readFile } from 'node:fs/promises';
+import { open, realpath } from 'node:fs/promises';
+import { isAbsolute, relative } from 'node:path';
 import type { JailPolicy } from './types.js';
 import { composeBwrapArgv } from './bwrap-compose.js';
 import { gateReadPath, VisionPathEscapeError } from './read-gate.js';
@@ -62,5 +63,25 @@ export function spawnJailedSession(policy: JailPolicy): ChildProcess {
 export async function readInSession(rawPath: string, worktreeRoot: string): Promise<string> {
   // May throw VisionPathEscapeError — re-thrown to caller for security dispatch
   const canonicalPath = await gateReadPath(rawPath, worktreeRoot);
-  return readFile(canonicalPath, 'utf-8');
+
+  // Open the file and re-verify via fd-level realpath to close the TOCTOU window.
+  // /proc/self/fd/<fd> gives the kernel-resolved path for the open file descriptor
+  // (Linux / WSL2 specific — documented dependency per CR-02 fix).
+  const fh = await open(canonicalPath, 'r');
+  try {
+    const fdPath = `/proc/self/fd/${fh.fd}`;
+    const fdResolved = await realpath(fdPath);
+    const worktreeReal = await realpath(worktreeRoot);
+    const rel = relative(worktreeReal, fdResolved);
+    if (rel.startsWith('..') || isAbsolute(rel)) {
+      throw new VisionPathEscapeError({
+        attempted: rawPath,
+        resolvedUnder: fdResolved,
+        worktreeReal,
+      });
+    }
+    return await fh.readFile('utf-8');
+  } finally {
+    await fh.close();
+  }
 }
