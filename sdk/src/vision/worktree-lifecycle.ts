@@ -273,6 +273,12 @@ export async function teardownWorktreeAbort(
   const abortReportPath = join(repoRoot, '.planning', `VISION-ABORT-${sid}.md`);
   await mkdir(dirname(abortReportPath), { recursive: true });
 
+  // Use four-backtick fences so any triple-backtick sequence in the diff or
+  // direction text cannot break the fenced code block structure of the report.
+  // Escape backticks in direction (user-supplied) to prevent fence injection.
+  const FENCE = '````';
+  const safeDirection = direction.replace(/`/g, '\\`');
+
   const body = [
     '---',
     `session_id: ${sid}`,
@@ -282,7 +288,7 @@ export async function teardownWorktreeAbort(
     '',
     '# Vision Session Aborted — SAFE-04 Diff-Assertion Failure',
     '',
-    `**Direction:** ${direction}`,
+    `**Direction:** ${safeDirection}`,
     '',
     '## Violating Paths',
     '',
@@ -290,15 +296,15 @@ export async function teardownWorktreeAbort(
     '',
     '## Diff Stat',
     '',
-    '```',
+    FENCE,
     assertion.rawDiffStat || '(empty)',
-    '```',
+    FENCE,
     '',
     '## Full Diff',
     '',
-    '```diff',
+    `${FENCE}diff`,
     assertion.rawDiff || '(empty)',
-    '```',
+    FENCE,
     '',
     `Worktree quarantined at: \`${quarantinePath}\``,
     'Inspect manually and \`rm -rf\` when satisfied (D-03).',
