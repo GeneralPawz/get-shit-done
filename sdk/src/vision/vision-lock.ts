@@ -118,6 +118,18 @@ export async function acquireVisionLock(
         continue;
       }
 
+      // Belt check: PID alive but lock is impossibly old (> 10h hard cap).
+      // Guards against PID recycling where a crashed session's PID was reused
+      // by an unrelated process — the PID appears alive but the session is gone.
+      // No vision session legitimately runs longer than MAX_SESSION_LIFETIME_MS.
+      const MAX_SESSION_LIFETIME_MS = 10 * 60 * 60 * 1000; // 10h hard cap
+      const lockAge = Date.now() - new Date(existing.started_at).getTime();
+      if (dead === false && lockAge > MAX_SESSION_LIFETIME_MS) {
+        // PID alive but session is impossibly old — treat as stale
+        await unlink(lockPath).catch(() => {});
+        continue;
+      }
+
       // Holder is alive (or we can't determine) — refuse
       return { refused: existing };
     }
