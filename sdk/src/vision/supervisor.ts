@@ -57,14 +57,20 @@ const GRACE_MS = 60_000;
  * Run a jailed session under bwrap and supervise it with the STOP-01 signal
  * ladder. Resolves when the child exits (either naturally or via signal).
  *
- * @param policy          JailPolicy describing the bwrap invocation
- * @param ceilingMs       Wall-clock ceiling in milliseconds (D-08)
- * @param visionStatePath Absolute path to vision-state.json for belt state write
+ * @param policy              JailPolicy describing the bwrap invocation
+ * @param ceilingMs           Wall-clock ceiling in milliseconds (D-08)
+ * @param visionStatePath     Absolute path to vision-state.json for belt state write
+ * @param sessionProvenance   Optional: session identity fields used in the fallback
+ *                            minimal state when vision-state.json is absent or corrupt
+ *                            at ceiling time. Without this the fallback uses 'UNKNOWN'
+ *                            for session_id and empty strings for branch/sha, making the
+ *                            wake-up flow unable to correlate the result with any session.
  */
 export async function superviseSession(
   policy: JailPolicy,
   ceilingMs: number,
   visionStatePath: string,
+  sessionProvenance?: { sid: string; sourceBranch: string; sourceHeadSha: string },
 ): Promise<SessionResult> {
   // Re-entrancy guard: process-level signal handlers must not be stacked.
   // Two concurrent superviseSession calls would each register forwardTerm,
@@ -206,13 +212,14 @@ export async function superviseSession(
           }
         : ({
             // Fallback minimal state when vision-state.json is absent or corrupt.
-            // Provides enough context for the wake-up flow to know the session hit
-            // the ceiling and that no partial results are available.
+            // Use sessionProvenance (caller-supplied) when available so the wake-up
+            // flow can correlate the result with the session and find the source branch.
+            // Falls back to 'UNKNOWN' / empty strings only when provenance was not passed.
             schema_version: 1,
-            session_id: 'UNKNOWN',
+            session_id: sessionProvenance?.sid ?? 'UNKNOWN',
             direction: '',
-            source_branch: '',
-            source_head_sha: '',
+            source_branch: sessionProvenance?.sourceBranch ?? '',
+            source_head_sha: sessionProvenance?.sourceHeadSha ?? '',
             worktree_path: policy.worktreePath,
             started_at: new Date().toISOString(),
             ceiling_at: new Date().toISOString(),
