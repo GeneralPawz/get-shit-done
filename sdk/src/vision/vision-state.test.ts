@@ -147,6 +147,12 @@ describe('vision-state', () => {
     spawnSync('git', ['add', 'README.md'], { cwd: gitDir, stdio: 'pipe' });
     spawnSync('git', ['commit', '--allow-empty', '-m', 'init'], { cwd: gitDir, stdio: 'pipe' });
 
+    // Create .planning/ directory so git add .planning/ succeeds
+    await mkdir(join(gitDir, '.planning'), { recursive: true });
+    await writeFile(join(gitDir, '.planning', 'placeholder.md'), '# planning', 'utf-8');
+    spawnSync('git', ['add', '.planning/'], { cwd: gitDir, stdio: 'pipe' });
+    spawnSync('git', ['commit', '--allow-empty', '-m', 'add planning dir'], { cwd: gitDir, stdio: 'pipe' });
+
     const state: VisionState = { ...baseState, round: 3 };
     const statePath = join(gitDir, 'vision-state.json');
     await writeCheckpoint(statePath, state, gitDir);
