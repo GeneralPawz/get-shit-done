@@ -26,7 +26,16 @@ import { spawn, type ChildProcess } from 'node:child_process';
 import { composeBwrapArgv } from './bwrap-compose.js';
 import { readCheckpoint } from './vision-state.js';
 import { atomicWriteJson } from './atomic-write.js';
+import { GSDError, ErrorClassification } from '../errors.js';
 import type { JailPolicy, VisionState } from './types.js';
+
+// ─── Re-entrancy guard ────────────────────────────────────────────────────────
+//
+// superviseSession registers process-level SIGINT/SIGTERM/uncaughtException
+// handlers. Concurrent calls from the same process would stack handlers,
+// causing the second call's forwardTerm to fire on signals intended only for
+// the first session's child. Reject concurrent calls at the entry point.
+let _activeSession = false;
 
 // ─── Public types ─────────────────────────────────────────────────────────────
 
@@ -57,6 +66,18 @@ export async function superviseSession(
   ceilingMs: number,
   visionStatePath: string,
 ): Promise<SessionResult> {
+  // Re-entrancy guard: process-level signal handlers must not be stacked.
+  // Two concurrent superviseSession calls would each register forwardTerm,
+  // causing the second session's Ctrl-C to also signal the first session's
+  // child (or an already-exited child). Reject concurrent entry.
+  if (_activeSession) {
+    throw new GSDError(
+      'superviseSession: re-entrant call detected — only one vision session may run per process',
+      ErrorClassification.Execution,
+    );
+  }
+  _activeSession = true;
+
   // Build argv from the pure composer and spawn the child.
   // NOT detached — supervisor owns the process group for signal delivery.
   const argv = composeBwrapArgv(policy);
@@ -152,6 +173,7 @@ export async function superviseSession(
   process.off('SIGINT', forwardTerm);
   process.off('SIGTERM', forwardTerm);
   process.off('uncaughtException', crashHandler);
+  _activeSession = false; // clear re-entrancy guard — next call may proceed
 
   // ─── Ceiling-hit belt state write (D-07 belt-and-suspenders) ─────────────
   //
