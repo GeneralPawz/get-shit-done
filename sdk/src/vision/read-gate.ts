@@ -19,7 +19,7 @@
  */
 
 import { realpath } from 'node:fs/promises';
-import { isAbsolute, normalize, relative, resolve } from 'node:path';
+import { dirname, isAbsolute, normalize, relative, resolve } from 'node:path';
 
 // ─── Error class ─────────────────────────────────────────────────────────────
 
@@ -98,6 +98,31 @@ export async function gateReadPath(rawPath: string, worktreeRoot: string): Promi
   } catch {
     // Dangling or not-yet-created path — fall through to the raw normalized candidate.
     // The relative-path check below still catches `..`-escapes via resolve().
+    // Additionally, walk up to the nearest existing ancestor and verify it is
+    // inside the worktree. This closes the gap where a symlink *parent directory*
+    // (e.g., worktree/.planning/ → /tmp/outside/) would pass the relative check
+    // on the dangling candidate string but write outside the worktree on creation.
+    let ancestor = candidate;
+    let ancestorReal: string | null = null;
+    while (ancestor !== dirname(ancestor)) {
+      ancestor = dirname(ancestor);
+      try {
+        ancestorReal = await realpath(ancestor);
+        break;
+      } catch {
+        /* continue walking up */
+      }
+    }
+    if (ancestorReal !== null) {
+      const ancestorRel = relative(worktreeReal, ancestorReal);
+      if (ancestorRel.startsWith('..') || isAbsolute(ancestorRel)) {
+        throw new VisionPathEscapeError({
+          attempted: rawPath,
+          resolvedUnder: candidate,
+          worktreeReal,
+        });
+      }
+    }
     realCandidate = candidate;
   }
 
