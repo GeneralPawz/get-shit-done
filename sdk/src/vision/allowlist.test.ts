@@ -14,7 +14,7 @@ import { tmpdir } from 'node:os';
 // test works regardless of cwd (sdk/ or repo root). The relative depth:
 //   sdk/src/vision/allowlist.test.ts  →  ../../../ is sdk/  →  ../../../.. is repo root
 const REAL_ALLOWLIST_PATH = fileURLToPath(
-  new URL('../../../../get-shit-done/references/vision-bash-allowlist.json', import.meta.url),
+  new URL('../../../get-shit-done/references/vision-bash-allowlist.json', import.meta.url),
 );
 
 let tmpDir: string;
