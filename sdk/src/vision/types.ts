@@ -27,7 +27,7 @@ export interface VisionState {
   started_at: string;              // ISO 8601
   ceiling_at: string;              // ISO 8601
   status: SessionStatus;
-  stop_reason: 'ceiling' | 'converged' | 'aborted' | 'crashed' | null;
+  stop_reason: 'ceiling' | 'wall-clock-ceiling' | 'converged' | 'aborted' | 'crashed' | null;
   partial_results_available: boolean;
   round: number;
   round_results: unknown[];
