@@ -46,7 +46,7 @@ describe('loadAllowlist', () => {
       p,
       JSON.stringify({
         schema_version: 1,
-        patterns: [{ pattern: '[unclosed', description: 'x' }],
+        patterns: [{ pattern: '^[unclosed$', description: 'x' }],
       }),
     );
     const { loadAllowlist } = await import('./allowlist.js');

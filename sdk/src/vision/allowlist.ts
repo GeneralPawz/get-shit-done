@@ -87,6 +87,12 @@ export async function loadAllowlist(path: string): Promise<CompiledAllowlist> {
   }
 
   const entries = parsed.patterns.map((p) => {
+    if (!p.pattern.startsWith('^') || !p.pattern.endsWith('$')) {
+      throw new GSDError(
+        `allowlist pattern must be fully anchored (^…$): ${p.pattern}`,
+        ErrorClassification.Validation,
+      );
+    }
     let re: RegExp;
     try {
       re = new RegExp(p.pattern);
