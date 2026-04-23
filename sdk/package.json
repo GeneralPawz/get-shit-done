@@ -40,7 +40,8 @@
     "test:integration": "vitest run --project integration"
   },
   "dependencies": {
-    "@anthropic-ai/claude-agent-sdk": "^0.2.84",
+    "@anthropic-ai/claude-agent-sdk": "^0.2.117",
+    "ulidx": "^2.4.1",
     "ws": "^8.20.0"
   },
   "devDependencies": {
