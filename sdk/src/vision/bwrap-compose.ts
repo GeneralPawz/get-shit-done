@@ -79,6 +79,7 @@ export function composeBwrapArgv(p: JailPolicy): string[] {
     '--ro-bind', '/bin', '/bin',
     '--ro-bind', '/lib', '/lib',
     '--ro-bind-try', '/lib64', '/lib64',   // optional on ARM/some distros
+    '--ro-bind-try', '/run', '/run',       // gh CLI / dbus credential helpers may need /run/user/<uid>
     '--ro-bind', p.repoReadOnlyRoot, p.repoReadOnlyRoot,
     '--bind', p.worktreePath, p.worktreePath,
     '--proc', '/proc',
