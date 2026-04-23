@@ -144,6 +144,18 @@ export async function assertWorktreeDiffClean(
     .map((s) => s.trim())
     .filter(Boolean);
 
+  // Invariant: git diff --name-only never emits paths with embedded '..' components.
+  // If it ever does (e.g., a future git version, a custom diff driver, or a crafted
+  // repo object), bail immediately — the ALLOWED regex relies on '^' anchoring to
+  // block leading traversal only, not embedded '..' sequences.
+  const hasEmbeddedTraversal = changed.some((p) => p.includes('..'));
+  if (hasEmbeddedTraversal) {
+    throw new GSDError(
+      'git diff --name-only emitted a path with embedded ".." — unexpected, aborting for safety',
+      ErrorClassification.Execution,
+    );
+  }
+
   const violators = changed.filter((p) => !ALLOWED.test(p));
 
   // Always capture stat + full diff for the quarantine report (cheap; also available on ok:true for callers)
