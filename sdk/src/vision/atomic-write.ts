@@ -7,6 +7,7 @@
  */
 
 import { writeFile, rename, unlink } from 'node:fs/promises';
+import { randomBytes } from 'node:crypto';
 
 /**
  * Atomic JSON write via tmp + rename, with D5 fallback.
@@ -16,7 +17,7 @@ import { writeFile, rename, unlink } from 'node:fs/promises';
  * @param payload    - Any JSON-serializable value
  */
 export async function atomicWriteJson<T>(targetPath: string, payload: T): Promise<void> {
-  const tmpPath = `${targetPath}.tmp.${process.pid}`;
+  const tmpPath = `${targetPath}.tmp.${process.pid}.${randomBytes(4).toString('hex')}`;
   const content = JSON.stringify(payload, null, 2) + '\n';
   try {
     await writeFile(tmpPath, content, 'utf-8');
