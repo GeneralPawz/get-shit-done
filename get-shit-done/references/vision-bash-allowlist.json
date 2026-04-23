@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "patterns": [
+    { "pattern": "^tsc --noEmit( --\\S+)*$", "description": "TypeScript type check only", "source": "SAFE-03" },
+    { "pattern": "^npm (outdated|list|view|ls)( .*)?$", "description": "npm read-only queries", "source": "SAFE-03" },
+    { "pattern": "^gh (pr|issue|run|release) (list|view)( --\\S+( \\S+)?)*$", "description": "GitHub CLI read-only", "source": "SAFE-03" },
+    { "pattern": "^git (status|log|diff|show|branch|rev-parse|rev-list|remote|config --get [\\w.-]+)( .*)?$", "description": "git read-only", "source": "SAFE-03" },
+    { "pattern": "^\\S+ (--help|-h)$", "description": "any command's help flag", "source": "SAFE-03" },
+    { "pattern": "^node (--version|-v)$", "description": "node version check", "source": "SAFE-03" },
+    { "pattern": "^(tsc|npm|gh|git|node|npx) --version$", "description": "version checks", "source": "SAFE-03" },
+    { "pattern": "^(grep|rg|ag|fd|find)( .*)?$", "description": "read-only codebase search", "source": "SAFE-03" },
+    { "pattern": "^(cat|head|tail|wc|file|stat|ls|realpath) .+$", "description": "read-only filesystem inspection", "source": "SAFE-03" },
+    { "pattern": "^gsd-sdk query state[. ](load|json|get|snapshot)( .*)?$", "description": "gsd-sdk state reads (per D-12 audit)", "source": "D-12" },
+    { "pattern": "^gsd-sdk query state-project-load( .*)?$", "description": "gsd-sdk state-project-load (per D-12 audit)", "source": "D-12" },
+    { "pattern": "^gsd-sdk query config[. ](get|path)( .*)?$", "description": "gsd-sdk config reads (per D-12 audit)", "source": "D-12" },
+    { "pattern": "^gsd-sdk query resolve-model( .*)?$", "description": "gsd-sdk resolve-model (per D-12 audit)", "source": "D-12" },
+    { "pattern": "^gsd-sdk query (find-phase|phase-plan-index|phases[. ]list|phase[. ]next-decimal|phase[. ]list-plans|phase[. ]list-artifacts|plan[. ]task-structure|requirements[. ]extract-from-plans)( .*)?$", "description": "gsd-sdk phase reads (per D-12 audit)", "source": "D-12" },
+    { "pattern": "^gsd-sdk query roadmap[. ](analyze|get-phase)( .*)?$", "description": "gsd-sdk roadmap reads (per D-12 audit)", "source": "D-12" },
+    { "pattern": "^gsd-sdk query (progress[. ]json|progress[. ]bar|progress[. ]table|stats[. ]json|stats[. ]table|todo[. ]match-phase|list-todos)( .*)?$", "description": "gsd-sdk progress reads (per D-12 audit)", "source": "D-12" },
+    { "pattern": "^gsd-sdk query frontmatter[. ]get( .*)?$", "description": "gsd-sdk frontmatter.get (per D-12 audit)", "source": "D-12" },
+    { "pattern": "^gsd-sdk query verify[. ](plan-structure|phase-completeness|artifacts|commits|references|summary|path-exists|key-links|schema-drift)( .*)?$", "description": "gsd-sdk verify reads (per D-12 audit)", "source": "D-12" },
+    { "pattern": "^gsd-sdk query validate[. ](consistency|agents)( .*)?$", "description": "gsd-sdk validate reads (per D-12 audit)", "source": "D-12" },
+    { "pattern": "^gsd-sdk query workstream[. ](get|list|status)( .*)?$", "description": "gsd-sdk workstream reads (per D-12 audit)", "source": "D-12" },
+    { "pattern": "^gsd-sdk query intel[. ](status|diff|validate|query|extract-exports|update)( .*)?$", "description": "gsd-sdk intel reads (per D-12 audit)", "source": "D-12" },
+    { "pattern": "^gsd-sdk query learnings[. ](list|query)( .*)?$", "description": "gsd-sdk learnings reads (per D-12 audit)", "source": "D-12" },
+    { "pattern": "^gsd-sdk query (generate-slug|current-timestamp|summary[. ]extract|history[. ]digest|uat[. ]render-checkpoint|audit[. ](uat|open)|detect-custom-files|config-gates|check-(auto-mode|completion|gates|verification-status|ship-ready)|phase[. ]ready|route-next-action|detect-phase-type|websearch|skills[. ]list|skill-manifest|extract-messages|scan-sessions|profile[. ](sample|questionnaire))( .*)?$", "description": "gsd-sdk generic reads (per D-12 audit)", "source": "D-12" },
+    { "pattern": "^gsd-sdk query init[. ](execute-phase|plan-phase|new-project|new-milestone|quick|resume|verify-work|phase-op|todos|milestone-op|map-codebase|new-workspace|list-workspaces|remove-workspace|ingest-docs|progress|manager)( .*)?$", "description": "gsd-sdk init.* composition (read-only bootstraps)", "source": "D-12" },
+    { "pattern": "^gsd-sdk query agent-skills( .*)?$", "description": "gsd-sdk agent-skills read", "source": "D-12" }
+  ]
+}
