@@ -202,6 +202,15 @@ describe('deduplicateFrontier', () => {
     expect(merged).toHaveLength(2);
   });
 
+  it('DEDUP-TIE: equal scores preserve the existing entry (id stability)', async () => {
+    const { deduplicateFrontier } = await import('./round-result.js');
+    const existing = [makeNode({ id: 'OLD000000000000000000000AA', topic: 'x', score: 0.5 })];
+    const incoming = [makeNode({ id: 'NEW000000000000000000000BB', topic: 'x', score: 0.5 })];
+    const result = deduplicateFrontier(existing, incoming);
+    expect(result).toHaveLength(1);
+    expect(result[0].id).toBe('OLD000000000000000000000AA');
+  });
+
   it('idempotent on empty incoming', async () => {
     const { deduplicateFrontier } = await import('./round-result.js');
     const existing = [makeNode({ id: 'A0000000000000000000000000', topic: 'x' })];

@@ -74,6 +74,10 @@ export function selectTopK(frontier: FrontierNode[], k: number): FrontierNode[] 
  * are resolved by keeping the HIGHER-scored entry and setting that entry's
  * parent_round to the EARLIER of the two (so Phase 3 backtrack can trace origin).
  *
+ * Tie-break: when next.score === prev.score, the existing entry is kept (ULID/id
+ * stability — the older ULID is preserved so callers can rely on id not changing
+ * after a tie-scored re-discovery of the same topic).
+ *
  * Non-matching incoming nodes are appended as-is.
  * Pure: neither input array is mutated.
  */
