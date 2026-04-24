@@ -220,6 +220,38 @@ describe('deduplicateFrontier', () => {
   });
 });
 
+// ─── direction-snapshot drift behaviour ──────────────────────────────────────
+
+describe('direction-snapshot drift (WR-02)', () => {
+  it('WR-02: drift clears new_frontier_nodes and appends direction-snapshot-drift error', async () => {
+    // Simulate what runOneRound does on drift: spread with new_frontier_nodes:[] then withError.
+    const { buildRoundResult } = await import('./round-result.js');
+    const base = buildRoundResult({
+      round: 1, startedAt: 's', endedAt: 'e', directionSnapshot: 'original direction',
+      topicsSelected: ['A0000000000000000000000000'],
+      findings: [],
+      newFrontierNodes: [makeNode({ id: 'A0000000000000000000000000', topic: 'tainted node' })],
+      scores: { score_distribution: [], selection_rationale: [] },
+      subagentCount: 1, errors: [],
+    });
+
+    // Simulate the drift branch: clear new_frontier_nodes, append error
+    const drifted = {
+      ...base,
+      new_frontier_nodes: [],
+      errors: [...base.errors, { topic_id: '*' as const, reason: 'direction-snapshot-drift' }],
+    };
+
+    // Tainted nodes are NOT present in the result
+    expect(drifted.new_frontier_nodes).toHaveLength(0);
+    // Error is recorded
+    expect(drifted.errors).toHaveLength(1);
+    expect(drifted.errors[0].reason).toBe('direction-snapshot-drift');
+    // backtrack_flag is still false (LOOP-04 unaffected by drift handling)
+    expect(drifted.backtrack_flag).toBe(false);
+  });
+});
+
 // ─── buildRoundResult ─────────────────────────────────────────────────────────
 
 describe('buildRoundResult', () => {
