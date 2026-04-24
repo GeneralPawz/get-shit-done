@@ -23,7 +23,10 @@
       "WebFetch(domain:192.168.*)",
       "WebFetch(domain:169.254.*)",
       "WebFetch(domain:127.*)",
-      "WebFetch(domain:localhost)"
+      "WebFetch(domain:localhost)",
+      "WebFetch(domain:::1)",
+      "WebFetch(domain:::ffff:127.*)",
+      "WebFetch(domain:0.0.0.0)"
     ],
     "allow": [
       "Write(<WORKTREE>/.planning/drafts/**)",
