@@ -93,10 +93,15 @@ export async function runOneRound(
   });
 
   // ─── Direction-drift defensive check (Pitfall 5 / T-02-direction-drift)
+  // On drift: clear new_frontier_nodes so nodes scored against the wrong direction are NOT
+  // merged into the frontier. The errors[] append stays so the drift is auditable.
   const finalRound: RoundResult =
     roundResult.direction_snapshot === directionSnapshot
       ? roundResult
-      : withError(roundResult, { topic_id: '*', reason: 'direction-snapshot-drift' });
+      : withError(
+          { ...roundResult, new_frontier_nodes: [] },
+          { topic_id: '*', reason: 'direction-snapshot-drift' },
+        );
 
   // ─── Merge into state
   const nextFrontier = deduplicateFrontier(
