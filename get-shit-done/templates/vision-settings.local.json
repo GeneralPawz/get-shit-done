@@ -2,7 +2,28 @@
   "permissions": {
     "deny": [
       "Write(/**)",
-      "Bash(*)"
+      "Bash(*)",
+      "WebFetch(domain:10.*)",
+      "WebFetch(domain:172.16.*)",
+      "WebFetch(domain:172.17.*)",
+      "WebFetch(domain:172.18.*)",
+      "WebFetch(domain:172.19.*)",
+      "WebFetch(domain:172.20.*)",
+      "WebFetch(domain:172.21.*)",
+      "WebFetch(domain:172.22.*)",
+      "WebFetch(domain:172.23.*)",
+      "WebFetch(domain:172.24.*)",
+      "WebFetch(domain:172.25.*)",
+      "WebFetch(domain:172.26.*)",
+      "WebFetch(domain:172.27.*)",
+      "WebFetch(domain:172.28.*)",
+      "WebFetch(domain:172.29.*)",
+      "WebFetch(domain:172.30.*)",
+      "WebFetch(domain:172.31.*)",
+      "WebFetch(domain:192.168.*)",
+      "WebFetch(domain:169.254.*)",
+      "WebFetch(domain:127.*)",
+      "WebFetch(domain:localhost)"
     ],
     "allow": [
       "Write(<WORKTREE>/.planning/drafts/**)",
@@ -10,7 +31,12 @@
       "Write(<WORKTREE>/.planning/VISION-CATCHUP.md)",
       "Write(<WORKTREE>/vision-state.json)",
       "Read(<WORKTREE>/**)",
-      "Read(<REPO_RO>/**)"
+      "Read(<REPO_RO>/**)",
+      "WebFetch(domain:docs.anthropic.com)",
+      "WebFetch(domain:developer.mozilla.org)",
+      "WebFetch(domain:*.readthedocs.io)",
+      "WebFetch(domain:nodejs.org)",
+      "WebFetch(domain:github.com)"
     ]
   }
 }
