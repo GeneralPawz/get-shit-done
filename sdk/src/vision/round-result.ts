@@ -45,7 +45,7 @@ export function parseRoundResult(raw: string): RoundResult | null {
   }
   if (typeof parsed !== 'object' || parsed === null) return null;
   const p = parsed as Record<string, unknown>;
-  if (typeof p.backtrack_flag !== 'boolean') return null;
+  if (p.backtrack_flag !== false) return null;
   if (typeof p.direction_snapshot !== 'string' || p.direction_snapshot.length === 0) return null;
   return parsed as RoundResult;
 }

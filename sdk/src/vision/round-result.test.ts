@@ -96,6 +96,11 @@ describe('parseRoundResult', () => {
     expect(parseRoundResult(validRoundResultJson({ direction_snapshot: 42 }))).toBeNull();
   });
 
+  it('SCHEMA-LOOP04: returns null when backtrack_flag is true (LOOP-04 greedy invariant)', async () => {
+    const { parseRoundResult } = await import('./round-result.js');
+    expect(parseRoundResult(validRoundResultJson({ backtrack_flag: true }))).toBeNull();
+  });
+
   it('returns null on malformed JSON', async () => {
     const { parseRoundResult } = await import('./round-result.js');
     expect(parseRoundResult('{ not json')).toBeNull();
