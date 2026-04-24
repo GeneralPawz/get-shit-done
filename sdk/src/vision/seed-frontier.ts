@@ -134,12 +134,26 @@ function extractNounPhrasesFallback(direction: string): FrontierNode[] {
   const normalized = normalizeTopic(direction); // strip stopwords + punctuation + case
   const tokens = normalized.split(' ').filter(t => t.length > 1);
 
+  // Include individual tokens so single-word directions (e.g. "caching") contribute
+  // their content to the seed list rather than being silently dropped.
+  const phrases: string[] = [...tokens];
+
   // Build 2–3-word sliding-window phrases from the normalized tokens.
-  const phrases: string[] = [];
   for (let i = 0; i < tokens.length; i++) {
     if (i + 1 < tokens.length) phrases.push(`${tokens[i]} ${tokens[i + 1]}`);
     if (i + 2 < tokens.length) phrases.push(`${tokens[i]} ${tokens[i + 1]} ${tokens[i + 2]}`);
   }
+
+  // Direction-derived variations: when tokens are available but phrase count is low,
+  // use direction-specific phrasing before falling back to fully generic seeds.
+  const directionBase = tokens[0] ?? '';
+  const DIRECTION_DERIVED = directionBase.length > 0
+    ? [
+        `${directionBase} context`,
+        `${directionBase} primitives`,
+        `${directionBase} mechanisms`,
+      ]
+    : [];
 
   // If the direction has too few tokens, use generic decomposition seeds so we always
   // return ≥ 3 nodes and the integration test can always proceed.
@@ -150,7 +164,7 @@ function extractNounPhrasesFallback(direction: string): FrontierNode[] {
     'testing approach',
     'key constraints',
   ];
-  const combined = phrases.length > 0 ? phrases : GENERIC;
+  const combined = phrases.length > 0 ? [...phrases, ...DIRECTION_DERIVED, ...GENERIC] : GENERIC;
 
   // Deduplicate, take up to 5, shape as questions.
   const seen = new Set<string>();

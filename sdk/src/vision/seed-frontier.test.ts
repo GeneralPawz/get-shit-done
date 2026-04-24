@@ -45,11 +45,15 @@ describe('seedFromDirection (deterministic fallback)', () => {
     }
   });
 
-  it('handles very short direction (single word)', async () => {
+  it('handles very short direction (single word) — direction content shapes seeds', async () => {
     const { seedFromDirection } = await import('./seed-frontier.js');
     const nodes = await seedFromDirection({ direction: 'caching', useLLM: false });
     expect(nodes.length).toBeGreaterThanOrEqual(3);
     expect(nodes.length).toBeLessThanOrEqual(5);
+    // The single token "caching" must appear in at least one seed topic so the fallback
+    // does not produce purely generic output for single-word directions (WR-04).
+    const topics = nodes.map(n => n.topic.toLowerCase());
+    expect(topics.some(t => t.includes('caching'))).toBe(true);
   });
 
   it('deterministic topics: same input produces same topics array', async () => {
