@@ -118,6 +118,17 @@ describe('superviseSession', () => {
       // (ForcedStopStub literal from forced-stop.ts — D-07). Both satisfy the contract;
       // canonical assertion for the stub's exact literal lives in 01-04's test suite.
       expect(['ceiling', 'wall-clock-ceiling']).toContain(parsed.stop_reason);
+
+      // Phase 3 D-13 + ROADMAP SC4 supervisor-fallback assertions:
+      // The child does NOT instantiate ForcedStopStub, so the supervisor's belt-write
+      // (PLAN 05) is the writer. It reconstructs stop_evidence from outside the jail.
+      expect(parsed.stop_evidence).not.toBeNull();
+      expect(parsed.stop_evidence!.ceiling_ms_elapsed).toBeGreaterThanOrEqual(2000);
+      expect(parsed.stop_evidence!.final_round).toBe(0);                       // seedStartingState seeds round=0
+      expect(typeof parsed.stop_evidence!.stopped_at).toBe('string');
+      expect(parsed.stop_evidence!.reason).toBeNull();                         // ceiling-hit path uses no reason discriminator
+      expect(parsed.stop_evidence!.last_caught_error).toBeNull();              // not a crashed path
+      expect(parsed.stop_evidence!.convergence_history).toEqual([]);           // seedStartingState had no prior history
     },
     10_000, // test timeout: 10s — prevents 60s grace from dominating CI
   );
