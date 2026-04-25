@@ -249,6 +249,7 @@ function classifyDecisionType(f: Finding): DecisionLogEntry['type'] {
 // ─── Window fire timing (D-04) ───────────────────────────────────────────────
 
 function windowConverged(state: VisionState, config: VisionConfig): boolean {
+  if (config.convergence.window <= 0) return false;  // guard: window=0 would cause vacuous-truth convergence via slice(-0)
   if ((state.stop_evidence?.convergence_history ?? []).length < config.convergence.window) return false; // Pitfall 3b
   const history = state.stop_evidence?.convergence_history ?? [];
   return history.slice(-config.convergence.window).every(v => v.converged);
