@@ -27,7 +27,7 @@ import { composeBwrapArgv } from './bwrap-compose.js';
 import { readCheckpoint } from './vision-state.js';
 import { atomicWriteJson } from './atomic-write.js';
 import { GSDError, ErrorClassification } from '../errors.js';
-import type { JailPolicy, VisionState } from './types.js';
+import type { JailPolicy, VisionState, StopEvidence } from './types.js';
 
 // ─── Re-entrancy guard ────────────────────────────────────────────────────────
 //
@@ -197,11 +197,17 @@ export async function superviseSession(
   if (ceilingFired) {
     const prev = await readCheckpoint(visionStatePath);
 
-    if (prev?.status === 'ceiling-hit') {
+    // D-13 stub-completeness contract (RESEARCH Risk Note 4): skip ONLY when the
+    // stub wrote BOTH status='ceiling-hit' AND a populated stop_evidence. The
+    // presence of stop_evidence is the marker that the stub completed its richer
+    // write (PLAN 04). If somehow status was set without stop_evidence (defense in
+    // depth — atomic-write should make this impossible), the supervisor still does
+    // its fallback write to fill the evidence.
+    if (prev?.status === 'ceiling-hit' && prev.stop_evidence != null) {
       // ForcedStopStub succeeded during the grace window. State is already durable
-      // and correct. Supervisor is a no-op on this path.
+      // and complete. Supervisor is a no-op on this path.
     } else {
-      // Stub did not complete (SIGKILL path) or file is absent/corrupt.
+      // Stub did not complete (SIGKILL path) or file is absent/corrupt or stop_evidence missing.
       // Write belt state from outside the jail.
       const ceilingHitState: VisionState = prev
         ? {
@@ -209,12 +215,12 @@ export async function superviseSession(
             status: 'ceiling-hit',
             stop_reason: 'ceiling',
             partial_results_available: prev.round > 0 || prev.round_results.length > 0,
+            // Phase 3 D-13: minimal stop_evidence reconstructed from supervisor-side state.
+            // Prefer whatever the stub may have partially written; else reconstruct.
+            stop_evidence: prev.stop_evidence ?? reconstructStopEvidenceFromState(prev, ceilingMs),
           }
         : ({
             // Fallback minimal state when vision-state.json is absent or corrupt.
-            // Use sessionProvenance (caller-supplied) when available so the wake-up
-            // flow can correlate the result with the session and find the source branch.
-            // Falls back to 'UNKNOWN' / empty strings only when provenance was not passed.
             schema_version: 1,
             session_id: sessionProvenance?.sid ?? 'UNKNOWN',
             direction: '',
@@ -231,7 +237,7 @@ export async function superviseSession(
             frontier: [],
             decisions_log: [],
             artifact_manifest: [],
-            stop_evidence: null,
+            stop_evidence: null,                                  // no source state to reconstruct from
           } as VisionState);
 
       // Write via atomicWriteJson directly — the supervisor is OUTSIDE the jail
@@ -247,5 +253,35 @@ export async function superviseSession(
     ceiling_fired: ceilingFired,
     sigterm_sent_at: sigtermSentAt,
     sigkill_sent_at: sigkillSentAt,
+  };
+}
+
+// ─── Stop-evidence reconstruction (D-13 supervisor fallback) ─────────────────
+
+/**
+ * Reconstruct a minimal StopEvidence from outside the jail when the
+ * ForcedStopStub did not complete its inside-jail write (SIGKILL fast path).
+ *
+ * Best-effort: convergence_history may be empty if prev had no stop_evidence
+ * (pre-Phase-3 state files, or sessions that died before the loop wrote any
+ * verdict). RESEARCH Open Q5 — initial stop_evidence is null until first
+ * verdict; older state files may legitimately have no history at ceiling time.
+ *
+ * `ceilingMs` is `number | null` so Task 2 (crashed path) can pass `null` —
+ * a crash is not ceiling-related.
+ */
+function reconstructStopEvidenceFromState(prev: VisionState, ceilingMs: number | null): StopEvidence {
+  return {
+    stopped_at: new Date().toISOString(),
+    final_round: prev.round,
+    final_frontier_pending_count: prev.frontier.filter(n => n.status === 'pending').length,
+    convergence_history: prev.stop_evidence?.convergence_history ?? [],
+    convergence_snapshot: prev.stop_evidence?.convergence_snapshot ?? null,
+    ceiling_ms_elapsed: ceilingMs,
+    drift_error_count: prev.round_results
+      .flatMap(r => r.errors)
+      .filter(e => e.reason === 'direction-snapshot-drift').length,
+    reason: null,
+    last_caught_error: null,
   };
 }
