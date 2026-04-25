@@ -82,7 +82,7 @@ describe('ForcedStopStub', () => {
   it('T4: SynthesisHook interface has exact frozen shape (compile-time assignability)', async () => {
     const mod = await import('./forced-stop.js');
     // compile-time: ForcedStopStub satisfies SynthesisHook
-    const _check: import('./forced-stop.js').SynthesisHook = { onForcedStop: async (_s) => {} };
+    const _check: import('./forced-stop.js').SynthesisHook = { onForcedStop: async (_s) => {}, onConverged: async (_s, _v) => {} };
     expect(_check).toBeDefined();
     expect(typeof mod.ForcedStopStub).toBe('function');
   });
