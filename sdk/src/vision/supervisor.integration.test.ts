@@ -52,6 +52,7 @@ async function seedStartingState(): Promise<VisionState> {
     frontier: [],
     decisions_log: [],
     artifact_manifest: [],
+    stop_evidence: null,
   };
   await writeFile(visionStatePath, JSON.stringify(v0, null, 2));
   return v0;
