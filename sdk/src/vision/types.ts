@@ -98,6 +98,50 @@ export interface RoundResult {
   errors: RoundError[];
 }
 
+// ─── Phase 3: Convergence + Decision Queue + Stop Evidence + Config ─────────
+
+/** D-02 — Decision queue entry. Populated deterministically by run-loop.ts populateDecisionsLog (D-08); the LLM never writes to this list. */
+export interface DecisionLogEntry {
+  id: string;                   // ULID via mintSessionId() from ./id.ts
+  round_added: number;
+  type: 'path_fork' | 'assumption_unverified' | 'risk_alert';
+  blocking: boolean;
+  resolved: boolean;
+}
+
+/** D-06 — Pure convergence verdict. Computed once per round by evaluateConvergence; appended to stop_evidence.convergence_history. */
+export interface ConvergenceVerdict {
+  converged: boolean;
+  conditions: { frontier: boolean; queue: boolean; sources: boolean };
+  evaluated_at: string;         // ISO 8601
+  round: number;
+  evidence: {
+    pending_count: number;
+    blocking_unresolved_count: number;
+    new_frontier_nodes_delta: number;
+  };
+}
+
+/** D-11 / D-17 — Stop reason evidence; populated on all four terminal paths (converged | ceiling-hit | aborted | crashed) with a path-appropriate subset. */
+export interface StopEvidence {
+  stopped_at: string;           // ISO 8601
+  final_round: number;
+  final_frontier_pending_count: number;
+  convergence_history: ConvergenceVerdict[];
+  convergence_snapshot?: ConvergenceVerdict | null;
+  ceiling_ms_elapsed?: number | null;
+  drift_error_count?: number;
+  reason?: 'max-rounds-exceeded' | 'consecutive-error-rounds' | 'uncaught-exception' | null;
+  last_caught_error?: { message: string; stack?: string } | null;
+}
+
+/** D-21 — Vision-loop tunable config. Loaded from .planning/config.json > workflow.vision.* by sdk/src/vision/config.ts loadVisionConfig(). ceiling_ms handled separately by supervisor/CLI (Phase 1 D-08 — not duplicated here). */
+export interface VisionConfig {
+  convergence: { pending_threshold: number; plateau_threshold: number; window: number };
+  safety:      { max_rounds: number; consecutive_error_abort: number };
+  decision_queue: { confidence_max: number; surprises_min: number };
+}
+
 // ─── Manifest ────────────────────────────────────────────────────────────────
 
 export interface SHAManifestEntry {
