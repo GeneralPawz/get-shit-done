@@ -98,6 +98,15 @@ export interface RoundResult {
   errors: RoundError[];
 }
 
+// ─── Phase 3: Convergence + Decision Queue + Stop Evidence + Config ─────────
+
+/** D-21 — Vision-loop tunable config. Loaded from .planning/config.json > workflow.vision.* by sdk/src/vision/config.ts loadVisionConfig(). ceiling_ms handled separately by supervisor/CLI (Phase 1 D-08 — not duplicated here). */
+export interface VisionConfig {
+  convergence: { pending_threshold: number; plateau_threshold: number; window: number };
+  safety:      { max_rounds: number; consecutive_error_abort: number };
+  decision_queue: { confidence_max: number; surprises_min: number };
+}
+
 // ─── Manifest ────────────────────────────────────────────────────────────────
 
 export interface SHAManifestEntry {
