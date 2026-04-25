@@ -98,9 +98,58 @@ export async function runLoop(
   opts: RunLoopOptions,
   config: VisionConfig,
 ): Promise<VisionState> {
-  // PLAN 03 Task 3 implements the body.
-  void initialState; void opts; void config;
-  throw new Error('not implemented — PLAN 03 Task 3');
+  // Pitfall 3a guard: state.round is incremented ONLY by runOneRound. runLoop's
+  // sole reader is the loop condition below. NEVER assign state.round here.
+  let state = initialState;
+
+  while (
+    state.round < config.safety.max_rounds &&
+    !opts.signal?.aborted &&
+    !consecutiveErrorRoundsTripped(state, config)
+  ) {
+    // 1. Phase 2 reuse seam (D-10 — never modify run-one-round.ts)
+    state = await runOneRound(state, opts);
+
+    // 2. Deterministic decision-queue rule (D-08; Pitfall 3c — only the last round)
+    state = populateDecisionsLog(state, config);
+
+    // 3. Pure convergence verdict (D-06, D-23 — in-memory state only)
+    const verdict = evaluateConvergence(state, config);
+
+    // 4. Accumulate verdict (D-12 — recorded every round on every terminal path)
+    state = appendVerdictToHistory(state, verdict);
+
+    // 5. Persist post-processed state (D-13 sole writer).
+    // duplicate-commit pattern / RESEARCH Risk Note 7 / option (c): runOneRound already
+    // wrote at line 120 of run-one-round.ts; this is the SECOND `checkpoint round N`
+    // commit per round. Accepted — forensics still work, ROADMAP SC1 git-log assertion passes.
+    await writeCheckpoint(opts.visionStatePath, state, opts.worktreeRoot);
+
+    // 6. D-04 window fire-timing exit (Pitfall 3b guard lives inside windowConverged)
+    if (windowConverged(state, config)) break;
+  }
+
+  // ─── Terminal-path branch arms ─────────────────────────────────────────────
+  // Order matters: signal-aborted MUST be checked first — supervisor/stub owns the
+  // ceiling-hit terminal write (D-09 + D-13); runLoop is silent on this path.
+
+  if (opts.signal?.aborted) {
+    // D-09 + D-13: ceiling/cancellation path. supervisor.ts + forced-stop.ts own
+    // the terminal write of status='ceiling-hit' + stop_evidence. runLoop is silent.
+    return state;
+  }
+
+  if (windowConverged(state, config)) {
+    const lastVerdict = state.stop_evidence?.convergence_history.at(-1) ?? null;
+    return transitionToConverged(state, lastVerdict, opts);
+  }
+
+  if (consecutiveErrorRoundsTripped(state, config)) {
+    return transitionToAborted(state, 'consecutive-error-rounds', opts);
+  }
+
+  // state.round >= max_rounds is the only remaining exit (D-18)
+  return transitionToAborted(state, 'max-rounds-exceeded', opts);
 }
 
 // ─── Convergence verdict (D-06, D-23) ────────────────────────────────────────
@@ -305,7 +354,7 @@ async function transitionToAborted(
   };
 
   await writeCheckpoint(opts.visionStatePath, nextState, opts.worktreeRoot);
-  // Aborted path does NOT call synthesisHook.onConverged or .onForcedStop.
+  // Aborted path does NOT call the synthesis hook (neither onConverged nor onForcedStop).
   // Phase 4 Synthesizer reads stop_evidence.reason to render the abort branch.
   return nextState;
 }
