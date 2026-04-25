@@ -117,12 +117,31 @@ export function evaluateConvergence(
   state: Readonly<VisionState>,
   config: Readonly<VisionConfig>,
 ): ConvergenceVerdict {
-  // PLAN 03 Task 3 implements the body.
-  void state; void config;
-  throw new Error('not implemented — PLAN 03 Task 3');
+  const pendingCount = state.frontier.filter(n => n.status === 'pending').length;
+  const blockingUnresolvedCount = state.decisions_log.filter(
+    e => e.blocking && !e.resolved,
+  ).length;
+  const lastResult = state.round_results[state.round_results.length - 1];
+  const newFrontierDelta = lastResult?.new_frontier_nodes.length ?? 0;
+
+  const c1 = pendingCount <= config.convergence.pending_threshold;
+  const c2 = blockingUnresolvedCount === 0;
+  const c3 = newFrontierDelta <= config.convergence.plateau_threshold;
+
+  return {
+    converged: c1 && c2 && c3,
+    conditions: { frontier: c1, queue: c2, sources: c3 },
+    evaluated_at: new Date().toISOString(),
+    round: state.round,
+    evidence: {
+      pending_count: pendingCount,
+      blocking_unresolved_count: blockingUnresolvedCount,
+      new_frontier_nodes_delta: newFrontierDelta,
+    },
+  };
 }
 
-// ─── Decision-queue population rule (D-08) ───────────────────────────────────
+// ─── Decision-queue rule (D-08) ──────────────────────────────────────────────
 
 /**
  * Deterministic per-finding rule. NOT per-round (Pitfall 3c — only inspects the
@@ -145,15 +164,148 @@ export function populateDecisionsLog(
   state: VisionState,
   config: VisionConfig,
 ): VisionState {
-  // PLAN 03 Task 3 implements the body.
-  void state; void config;
-  throw new Error('not implemented — PLAN 03 Task 3');
+  const lastResult = state.round_results[state.round_results.length - 1];
+  if (!lastResult) return state;
+
+  const entries: DecisionLogEntry[] = [];
+  for (const finding of lastResult.findings) {
+    const surprises = finding.surprises ?? [];      // RESEARCH A1 defensive
+    if (
+      finding.confidence < config.decision_queue.confidence_max &&
+      surprises.length >= config.decision_queue.surprises_min
+    ) {
+      entries.push({
+        id: mintSessionId(),
+        round_added: lastResult.round,
+        type: classifyDecisionType(finding),
+        blocking: finding.confidence < 0.4,           // RESEARCH Open Q1 — hard-coded; Phase 6 tuning target
+        resolved: false,
+      });
+    }
+  }
+  if (entries.length === 0) return state;
+  return { ...state, decisions_log: [...state.decisions_log, ...entries] };
 }
 
-// ─── Unused import suppression ────────────────────────────────────────────────
-// These are used by Task 2/3 helpers and are imported now to avoid re-imports
-// being treated as changes to the public import surface.
-void (mintSessionId as unknown);
-void (runOneRound as unknown);
-void (writeCheckpoint as unknown);
-type _SuppressUnused = DecisionLogEntry | Finding | StopEvidence;
+function classifyDecisionType(f: Finding): DecisionLogEntry['type'] {
+  const surprises = f.surprises ?? [];
+  if (surprises.length >= 2) return 'path_fork';
+  const followUps = f.follow_up_questions ?? [];        // RESEARCH A2 defensive
+  if (followUps.some(q => /risk|hazard|threat|concern/i.test(q))) {
+    return 'risk_alert';
+  }
+  return 'assumption_unverified';
+}
+
+// ─── Window fire timing (D-04) ───────────────────────────────────────────────
+
+function windowConverged(state: VisionState, config: VisionConfig): boolean {
+  if ((state.stop_evidence?.convergence_history ?? []).length < config.convergence.window) return false; // Pitfall 3b
+  const history = state.stop_evidence?.convergence_history ?? [];
+  return history.slice(-config.convergence.window).every(v => v.converged);
+}
+
+// ─── Consecutive-error rule (D-20) ───────────────────────────────────────────
+
+function consecutiveErrorRoundsTripped(state: VisionState, config: VisionConfig): boolean {
+  const K = config.safety.consecutive_error_abort;
+  const tail = state.round_results.slice(-K);
+  if (tail.length < K) return false;
+  // CONTEXT Specifics — conservative: requires errors.length > 0 AND findings.length === 0.
+  // A round where one researcher fails but others succeed does NOT count toward the tally.
+  return tail.every(r => r.errors.length > 0 && r.findings.length === 0);
+}
+
+// ─── Stop-evidence accumulators (D-12, D-17) ─────────────────────────────────
+
+function appendVerdictToHistory(state: VisionState, verdict: ConvergenceVerdict): VisionState {
+  const baseEvidence: StopEvidence = state.stop_evidence ?? {
+    stopped_at: '',                     // populated at terminal time
+    final_round: state.round,
+    final_frontier_pending_count: state.frontier.filter(n => n.status === 'pending').length,
+    convergence_history: [],
+  };
+  return {
+    ...state,
+    stop_evidence: {
+      ...baseEvidence,
+      convergence_history: [...baseEvidence.convergence_history, verdict],
+    },
+  };
+}
+
+function computeDriftErrorCount(state: VisionState): number {
+  return state.round_results
+    .flatMap(r => r.errors)
+    .filter(e => e.reason === 'direction-snapshot-drift').length;
+}
+
+// ─── Terminal-path helpers (D-07, D-17, D-19) ────────────────────────────────
+
+async function transitionToConverged(
+  state: VisionState,
+  verdict: ConvergenceVerdict | null,
+  opts: RunLoopOptions,
+): Promise<VisionState> {
+  const baseEvidence = state.stop_evidence ?? {
+    stopped_at: '', final_round: state.round, final_frontier_pending_count: 0,
+    convergence_history: [],
+  };
+  const stopEvidence: StopEvidence = {
+    ...baseEvidence,
+    stopped_at: new Date().toISOString(),
+    final_round: state.round,
+    final_frontier_pending_count: state.frontier.filter(n => n.status === 'pending').length,
+    convergence_snapshot: verdict,
+    drift_error_count: computeDriftErrorCount(state),
+  };
+  const nextState: VisionState = {
+    ...state,
+    status: 'converged',
+    stop_reason: 'converged',
+    partial_results_available: state.round > 0 || state.round_results.length > 0,
+    stop_evidence: stopEvidence,
+  };
+
+  // Pitfall 3d safeguard 1 of 2: persist status='converged' BEFORE awaiting hook.
+  // Safeguard 2 lives in PLAN 04 (forced-stop.ts onForcedStop short-circuits when
+  // state.status === 'converged' && state.stop_evidence != null).
+  await writeCheckpoint(opts.visionStatePath, nextState, opts.worktreeRoot);
+
+  if (verdict) {
+    await opts.synthesisHook.onConverged(nextState, verdict);
+  }
+
+  return nextState;
+}
+
+async function transitionToAborted(
+  state: VisionState,
+  reason: 'max-rounds-exceeded' | 'consecutive-error-rounds',
+  opts: RunLoopOptions,
+): Promise<VisionState> {
+  const baseEvidence = state.stop_evidence ?? {
+    stopped_at: '', final_round: state.round, final_frontier_pending_count: 0,
+    convergence_history: [],
+  };
+  const stopEvidence: StopEvidence = {
+    ...baseEvidence,
+    stopped_at: new Date().toISOString(),
+    final_round: state.round,
+    final_frontier_pending_count: state.frontier.filter(n => n.status === 'pending').length,
+    drift_error_count: computeDriftErrorCount(state),
+    reason,
+  };
+  const nextState: VisionState = {
+    ...state,
+    status: 'aborted',
+    stop_reason: 'aborted',
+    partial_results_available: state.round > 0 || state.round_results.length > 0,
+    stop_evidence: stopEvidence,
+  };
+
+  await writeCheckpoint(opts.visionStatePath, nextState, opts.worktreeRoot);
+  // Aborted path does NOT call synthesisHook.onConverged or .onForcedStop.
+  // Phase 4 Synthesizer reads stop_evidence.reason to render the abort branch.
+  return nextState;
+}

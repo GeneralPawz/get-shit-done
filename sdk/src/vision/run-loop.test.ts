@@ -414,14 +414,15 @@ describe('populateDecisionsLog (T16–T25)', async () => {
 
 describe('windowConverged and consecutiveErrorRoundsTripped (source check T26–T27)', () => {
   it('T26: windowConverged has Pitfall 3b length guard as first statement', () => {
-    // Verify the critical guard exists in source
+    // Verify the critical guard exists in source — opening brace is on the function
+    // signature line, so bodyLines[0] is the first body line.
     const lines = runLoopSource.split('\n');
     const fnIdx = lines.findIndex(l => l.includes('function windowConverged'));
     if (fnIdx === -1) return; // not yet implemented — skip
-    // Next non-empty line after the opening brace should be the length check
     const bodyLines = lines.slice(fnIdx + 1, fnIdx + 10).filter(l => l.trim());
-    const firstBodyLine = bodyLines[1]; // skip opening brace line
-    expect(firstBodyLine).toMatch(/history\.length < config\.convergence\.window/);
+    const firstBodyLine = bodyLines[0]; // first non-empty body line
+    // Guard must be the first statement — checks convergence_history length against window
+    expect(firstBodyLine).toMatch(/convergence_history.*\.length < config\.convergence\.window|convergence\.window.*return false/);
   });
 
   it('T27: consecutiveErrorRoundsTripped uses conservative rule (errors > 0 AND findings === 0)', () => {
