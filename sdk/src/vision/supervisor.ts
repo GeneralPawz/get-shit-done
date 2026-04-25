@@ -147,6 +147,33 @@ export async function superviseSession(
     } catch {
       /* best effort — child may already be gone */
     }
+
+    // Phase 3 D-17 (crashed terminal path): best-effort write of stop_evidence.last_caught_error.
+    // Fire-and-forget — Node's default uncaughtException behavior terminates the process
+    // after this handler returns, which races with the I/O completing. Best-effort by design.
+    // ALL file I/O wrapped in .catch(() => {}) so the handler never throws.
+    (async () => {
+      try {
+        const prev = await readCheckpoint(visionStatePath);
+        if (!prev) return;                              // no source state — nothing meaningful to write
+        const crashedState: VisionState = {
+          ...prev,
+          status: 'crashed',
+          stop_reason: 'crashed',
+          partial_results_available: prev.round > 0 || prev.round_results.length > 0,
+          stop_evidence: {
+            ...reconstructStopEvidenceFromState(prev, null),
+            reason: 'uncaught-exception',
+            last_caught_error: { message: err.message, stack: err.stack },
+          },
+        };
+        await atomicWriteJson(visionStatePath, crashedState);
+      } catch {
+        /* best effort — never throw inside uncaughtException; --die-with-parent
+           propagates SIGKILL into the jail anyway, so we won't leak processes */
+      }
+    })().catch(() => {});
+
     // After this handler returns, Node's default uncaughtException behavior
     // terminates the process, which triggers --die-with-parent in the jail.
   };
