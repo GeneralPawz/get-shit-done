@@ -322,9 +322,22 @@ async function transitionToConverged(
   // state.status === 'converged' && state.stop_evidence != null).
   await writeCheckpoint(opts.visionStatePath, nextState, opts.worktreeRoot);
 
-  if (verdict) {
-    await opts.synthesisHook.onConverged(nextState, verdict);
-  }
+  // WR-03: never silently skip onConverged. windowConverged guarantees history is
+  // non-empty under normal operation, but if convergence_history is somehow empty
+  // (e.g. pre-populated stop_evidence from a prior session, future refactor) we
+  // synthesise a minimal valid verdict rather than dropping the hook call entirely.
+  const effectiveVerdict: ConvergenceVerdict = verdict ?? {
+    converged: true,
+    conditions: { frontier: true, queue: true, sources: true },
+    evaluated_at: new Date().toISOString(),
+    round: state.round,
+    evidence: {
+      pending_count: state.frontier.filter(n => n.status === 'pending').length,
+      blocking_unresolved_count: 0,
+      new_frontier_nodes_delta: 0,
+    },
+  };
+  await opts.synthesisHook.onConverged(nextState, effectiveVerdict);
 
   return nextState;
 }
