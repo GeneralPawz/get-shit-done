@@ -106,6 +106,7 @@ export async function createVisionWorktree(
     frontier: [],
     decisions_log: [],
     artifact_manifest: [],
+    stop_evidence: null,
   };
 
   await writeCheckpoint(join(worktreePath, 'vision-state.json'), state);

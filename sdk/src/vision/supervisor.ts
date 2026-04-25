@@ -231,6 +231,7 @@ export async function superviseSession(
             frontier: [],
             decisions_log: [],
             artifact_manifest: [],
+            stop_evidence: null,
           } as VisionState);
 
       // Write via atomicWriteJson directly — the supervisor is OUTSIDE the jail

@@ -32,8 +32,10 @@ export interface VisionState {
   round: number;
   round_results: RoundResult[];
   frontier: FrontierNode[];
-  decisions_log: unknown[];
+  decisions_log: DecisionLogEntry[];
   artifact_manifest: SHAManifestEntry[];
+  /** D-11 — populated on terminal paths (converged | ceiling-hit | aborted | crashed); null until the loop has produced any output. */
+  stop_evidence: StopEvidence | null;
 }
 
 // ─── Phase 2: Frontier and Round types ───────────────────────────────────────
@@ -186,5 +188,11 @@ export interface JailPolicy {
 // ─── Hooks ───────────────────────────────────────────────────────────────────
 
 export interface SynthesisHook {
+  /** Phase 1 frozen signature — D-16 preserves state-only param. Called by supervisor SIGTERM grace window. */
   onForcedStop(state: Readonly<VisionState>): Promise<void>;
+  /** Phase 3 D-07 additive — converged-path callback. Phase 4 Synthesizer replaces both methods. */
+  onConverged(
+    state: Readonly<VisionState>,
+    verdict: Readonly<ConvergenceVerdict>,
+  ): Promise<void>;
 }

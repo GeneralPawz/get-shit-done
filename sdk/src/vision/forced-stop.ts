@@ -43,6 +43,11 @@ export class ForcedStopStub implements SynthesisHook {
     this.visionStatePath = opts.visionStatePath;
   }
 
+  /** Phase 3 D-07 additive no-op — Phase 4 Synthesizer replaces this with real converged-path handling. */
+  async onConverged(_state: Readonly<VisionState>, _verdict: Readonly<import('./types.js').ConvergenceVerdict>): Promise<void> {
+    // Phase 1 stub: no-op for converged path. Phase 4 replaces this.
+  }
+
   async onForcedStop(state: Readonly<VisionState>): Promise<void> {
     // (a) D-07 literal: atomically write ceiling-hit status into vision-state.json.
     // partial_results_available: true when the session completed at least one round
