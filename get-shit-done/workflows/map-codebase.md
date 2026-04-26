@@ -29,8 +29,8 @@ Documents are reference material for Claude when planning/executing. Always incl
 
 <step name="parse_paths_flag" priority="first">
 Parse an optional `--paths <p1,p2,...>` argument. When supplied (by the
-post-execute codebase-drift gate in `/gsd:execute-phase` or by a user running
-`/gsd:map-codebase --paths apps/accounting,packages/ui`), the workflow
+post-execute codebase-drift gate in `/gsd-execute-phase` or by a user running
+`/gsd-map-codebase --paths apps/accounting,packages/ui`), the workflow
 operates in **incremental-remap mode**:
 
 - Pass `--paths <p1>,<p2>,...` through to each spawned `gsd-codebase-mapper`
@@ -71,7 +71,7 @@ Load codebase mapping context:
 ```bash
 INIT=$(gsd-sdk query init.map-codebase)
 if [[ "$INIT" == @file:* ]]; then INIT=$(cat "${INIT#@file:}"); fi
-AGENT_SKILLS_MAPPER=$(gsd-sdk query agent-skills gsd-codebase-mapper 2>/dev/null)
+AGENT_SKILLS_MAPPER=$(gsd-sdk query agent-skills gsd-codebase-mapper)
 ```
 
 Extract from init JSON: `mapper_model`, `commit_docs`, `codebase_dir`, `existing_maps`, `has_maps`, `codebase_dir_exists`, `subagent_timeout`, `date`.
@@ -413,12 +413,12 @@ Created .planning/codebase/:
 
 `/clear` then:
 
-`/gsd:new-project`
+`/gsd-new-project`
 
 ---
 
 **Also available:**
-- Re-run mapping: `/gsd:map-codebase`
+- Re-run mapping: `/gsd-map-codebase`
 - Review specific file: `cat .planning/codebase/STACK.md`
 - Edit any document before proceeding
 

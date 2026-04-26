@@ -87,7 +87,7 @@ This runs in parallel - all gaps investigated simultaneously.
 **Load agent skills:**
 
 ```bash
-AGENT_SKILLS_DEBUGGER=$(gsd-sdk query agent-skills gsd-debugger 2>/dev/null)
+AGENT_SKILLS_DEBUGGER=$(gsd-sdk query agent-skills gsd-debugger)
 EXPECTED_BASE=$(git rev-parse HEAD)
 ```
 
@@ -220,7 +220,7 @@ Agents only diagnose—plan-phase --gaps handles fixes (no fix application).
 
 **Agent times out:**
 - Check DEBUG-{slug}.md for partial progress
-- Can resume with /gsd:debug
+- Can resume with /gsd-debug
 
 **All agents fail:**
 - Something systemic (permissions, git, etc.)

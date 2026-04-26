@@ -263,7 +263,7 @@ const CONFIG_DEFAULTS = {
   phase_naming: 'sequential', // 'sequential' (default, auto-increment) or 'custom' (arbitrary string IDs)
   project_code: null, // optional short prefix for phase dirs (e.g., 'CK' → 'CK-01-foundation')
   subagent_timeout: 300000, // 5 min default; increase for large codebases or slower models (ms)
-  security_enforcement: true, // workflow.security_enforcement — threat-model-anchored security verification via /gsd:secure-phase
+  security_enforcement: true, // workflow.security_enforcement — threat-model-anchored security verification via /gsd-secure-phase
   security_asvs_level: 1, // workflow.security_asvs_level — OWASP ASVS verification level (1=opportunistic, 2=standard, 3=comprehensive)
   security_block_on: 'high', // workflow.security_block_on — minimum severity that blocks phase advancement ('high' | 'medium' | 'low')
   post_planning_gaps: true, // workflow.post_planning_gaps — unified post-planning gap report (#2493): scan REQUIREMENTS.md + CONTEXT.md decisions vs all PLAN.md files
@@ -288,26 +288,40 @@ function loadConfig(cwd) {
     // Auto-detect and sync sub_repos: scan for child directories with .git
     let configDirty = false;
 
-    // Migrate legacy "multiRepo: true" boolean → sub_repos array
+    // Migrate legacy "multiRepo: true" boolean → planning.sub_repos array.
+    // Canonical location is planning.sub_repos (#2561); writing to top-level
+    // would be flagged as unknown by the validator below (#2638).
     if (parsed.multiRepo === true && !parsed.sub_repos && !parsed.planning?.sub_repos) {
       const detected = detectSubRepos(cwd);
       if (detected.length > 0) {
-        parsed.sub_repos = detected;
         if (!parsed.planning) parsed.planning = {};
+        parsed.planning.sub_repos = detected;
         parsed.planning.commit_docs = false;
         delete parsed.multiRepo;
         configDirty = true;
       }
     }
 
-    // Keep sub_repos in sync with actual filesystem
-    const currentSubRepos = parsed.sub_repos || parsed.planning?.sub_repos || [];
+    // Self-heal legacy/buggy installs: strip any stale top-level sub_repos,
+    // preserving its value as the planning.sub_repos seed if that slot is empty.
+    if (Object.prototype.hasOwnProperty.call(parsed, 'sub_repos')) {
+      if (!parsed.planning) parsed.planning = {};
+      if (!parsed.planning.sub_repos) {
+        parsed.planning.sub_repos = parsed.sub_repos;
+      }
+      delete parsed.sub_repos;
+      configDirty = true;
+    }
+
+    // Keep planning.sub_repos in sync with actual filesystem
+    const currentSubRepos = parsed.planning?.sub_repos || [];
     if (Array.isArray(currentSubRepos) && currentSubRepos.length > 0) {
       const detected = detectSubRepos(cwd);
       if (detected.length > 0) {
         const sorted = [...currentSubRepos].sort();
         if (JSON.stringify(sorted) !== JSON.stringify(detected)) {
-          parsed.sub_repos = detected;
+          if (!parsed.planning) parsed.planning = {};
+          parsed.planning.sub_repos = detected;
           configDirty = true;
         }
       }
@@ -322,14 +336,17 @@ function loadConfig(cwd) {
     // Derived from config-set's VALID_CONFIG_KEYS (canonical source) plus internal-only
     // keys that loadConfig handles but config-set doesn't expose. This avoids maintaining
     // a hardcoded duplicate that drifts when new config keys are added.
-    const { VALID_CONFIG_KEYS } = require('./config.cjs');
+    // DYNAMIC_KEY_PATTERNS supplies topLevel for each pattern so adding a new
+    // dynamic-pattern namespace to config-schema.cjs automatically updates this set
+    // — no more drift between the read side and the write side (#2687).
+    const { VALID_CONFIG_KEYS, DYNAMIC_KEY_PATTERNS } = require('./config-schema.cjs');
     const KNOWN_TOP_LEVEL = new Set([
       // Extract top-level key names from dot-notation paths (e.g., 'workflow.research' → 'workflow')
       ...[...VALID_CONFIG_KEYS].map(k => k.split('.')[0]),
-      // Section containers that hold nested sub-keys
-      'git', 'workflow', 'planning', 'hooks', 'features',
+      // Dynamic-pattern top-level containers (e.g. review, model_profile_overrides)
+      ...DYNAMIC_KEY_PATTERNS.map(p => p.topLevel),
       // Internal keys loadConfig reads but config-set doesn't expose
-      'model_overrides', 'agent_skills', 'context_window', 'resolve_model_ids', 'claude_md_path',
+      'model_overrides', 'context_window', 'resolve_model_ids', 'claude_md_path',
       // Deprecated keys (still accepted for migration, not in config-set)
       'depth', 'multiRepo',
     ]);
@@ -1742,11 +1759,28 @@ function resolveReasoningEffortInternal(cwd, agentType) {
  */
 function extractOneLinerFromBody(content) {
   if (!content) return null;
+  // Normalize EOLs so matching works for LF and CRLF files.
+  const normalized = content.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
   // Strip frontmatter first
-  const body = content.replace(/^---\n[\s\S]*?\n---\n*/, '');
-  // Find the first **...** line after a # heading
-  const match = body.match(/^#[^\n]*\n+\*\*([^*]+)\*\*/m);
-  return match ? match[1].trim() : null;
+  const body = normalized.replace(/^---\n[\s\S]*?\n---\n*/, '');
+  // Find the first **...** span on a line after a # heading.
+  // Two supported template forms:
+  //   1) Labeled:  **One-liner:** Real prose here.   (bug #2660 — new template)
+  //   2) Bare:     **Real prose here.**              (legacy template)
+  // For (1), the first bold span ends in a colon and the prose that follows
+  // on the same line is the one-liner. For (2), the bold span itself is the
+  // one-liner.
+  const match = body.match(/^#[^\n]*\n+\*\*([^*\n]+)\*\*([^\n]*)/m);
+  if (!match) return null;
+  const boldInner = match[1].trim();
+  const afterBold = match[2];
+  // Labeled form: bold span is a "Label:" prefix — capture prose after it.
+  if (/:\s*$/.test(boldInner)) {
+    const prose = afterBold.trim();
+    return prose.length > 0 ? prose : null;
+  }
+  // Bare form: the bold content itself is the one-liner.
+  return boldInner.length > 0 ? boldInner : null;
 }
 
 // ─── Misc utilities ───────────────────────────────────────────────────────────

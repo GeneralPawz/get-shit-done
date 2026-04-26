@@ -26,7 +26,7 @@
    (the user's persistent settings preference):
    ```bash
    if [[ ! "$ARGUMENTS" =~ --auto ]] && [[ ! "$ARGUMENTS" =~ --chain ]]; then
-     gsd-sdk query config-set workflow._auto_chain_active false 2>/dev/null
+     gsd-sdk query config-set workflow._auto_chain_active false || true
    fi
    ```
 
@@ -75,22 +75,22 @@
 
      /clear then:
 
-     Next: /gsd:discuss-phase ${NEXT_PHASE} ${WAS_CHAIN ? "--chain" : "--auto"} ${GSD_WS}
+     Next: /gsd-discuss-phase ${NEXT_PHASE} ${WAS_CHAIN ? "--chain" : "--auto"} ${GSD_WS}
      ```
    - **PLANNING COMPLETE** → Planning done, execution didn't complete:
      ```
      Auto-advance partial: Planning complete, execution did not finish.
-     Continue: /gsd:execute-phase ${PHASE} ${GSD_WS}
+     Continue: /gsd-execute-phase ${PHASE} ${GSD_WS}
      ```
    - **PLANNING INCONCLUSIVE / CHECKPOINT** → Stop chain:
      ```
      Auto-advance stopped: Planning needs input.
-     Continue: /gsd:plan-phase ${PHASE} ${GSD_WS}
+     Continue: /gsd-plan-phase ${PHASE} ${GSD_WS}
      ```
    - **GAPS FOUND** → Stop chain:
      ```
      Auto-advance stopped: Gaps found during execution.
-     Continue: /gsd:plan-phase ${PHASE} --gaps ${GSD_WS}
+     Continue: /gsd-plan-phase ${PHASE} --gaps ${GSD_WS}
      ```
 
 7. **If none of `--auto`, `--chain`, nor config enabled:** route to

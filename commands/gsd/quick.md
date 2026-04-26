@@ -71,7 +71,7 @@ For each directory found:
 - Check if PLAN.md exists
 - Check if SUMMARY.md exists; if so, read `status` from its frontmatter via:
   ```bash
-  gsd-sdk query frontmatter.get .planning/quick/{dir}/SUMMARY.md status 2>/dev/null
+  gsd-sdk query frontmatter.get .planning/quick/{dir}/SUMMARY.md status
   ```
 - Determine directory creation date: `stat -f "%SB" -t "%Y-%m-%d"` (macOS) or `stat -c "%w"` (Linux); fall back to the date prefix in the directory name (format: `YYYYMMDD-` prefix)
 - Derive display status:
@@ -118,7 +118,7 @@ Status: {status from SUMMARY.md frontmatter, or "no summary yet"}
 Description: {first non-empty line from PLAN.md after frontmatter}
 Last action: {last meaningful line of SUMMARY.md, or "none"}
 ─────────────────────────────────────
-Resume with: /gsd:quick resume {slug}
+Resume with: /gsd-quick resume {slug}
 ```
 
 No agent spawn. STOP after printing.
